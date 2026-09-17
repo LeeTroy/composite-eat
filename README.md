@@ -40,8 +40,8 @@ one line.
 `--format tree` (the default) prints a short annotated tree: COSE header
 parameters, CWT/EAT claims, COSE algorithm and hash identifiers are shown by
 name, byte strings as a preview plus their true length, and the cert
-chain and detached parts as sizes. It is ~1.3 KB (26 lines) versus ~32 KB
-(104 lines) for the JSON form. `--truncate N` sets the preview width here.
+chain and detached parts as sizes. It is ~1.3 KB (26 lines) versus ~36 KB
+(113 lines) for the JSON form. `--truncate N` sets the preview width here.
 
 `--decode-certs` parses the DER certificates in the token's `x5chain` header
 and in each detached part's `cert_chain`, printing one line per certificate:
@@ -54,11 +54,14 @@ a readability aid, not chain validation — no signature or path checking is
 performed.
 
 ```
-      33 (x5chain):        4 cert(s), 1465, 770, 909, 675 bytes
+      33 (x5chain):        7 cert(s), 1465, 772, 907, 674, 811, 536, 531 bytes
         [0] CN=DPE Leaf              EC secp384r1 2023-01-01..9999-12-31  issued by [1]
         [1] CN=Caliptra 1.0 Rt Alias EC secp384r1 2023-01-01..9999-12-31  issued by [2]
         [2] CN=Caliptra 1.0 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
-        [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issuer not in chain
+        [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issued by [4]
+        [4] CN=Caliptra 1.0 IDevID   EC secp384r1 2026-03-21..9999-12-31  issued by [5]
+        [5] CN=AST27x0_ECDSA0        EC secp384r1 2026-01-20..9999-12-31  issued by [6]
+        [6] CN=ASPEED_CA             EC secp384r1 2025-03-06..9999-12-31  self-signed
 ...
       cert_chain:          4983 B, 6 cert(s)
         [0] CN=DevelopCA             EC secp384r1 2026-09-08..2036-09-05  self-signed
@@ -83,7 +86,7 @@ identified rather than dumped.
             protected:     1 (alg) = -35 (ES384)
             unprotected:   4 (kid) = 4e1060f07274aeb56409503f163531aa473a7eb1b742eecdacb2721117002a35... (48 B)
             claims
-              10 (nonce):  c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e (32 B)
+              10 (nonce):  134cc77bf984305cdb849614bfc4be498fd1071c756f4264560aae9377fdd1c5 (32 B)
               263 (dbgstat): 1
               265 (profile) > Tag(111): 312e332e362e312e342e312e34323632332e312e33 (21 B) "1.3.6.1.4.1.42623.1.3"
               273 (measurements)
@@ -98,7 +101,7 @@ identified rather than dumped.
                       1 > 2 > [0]: [7, 5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)]
               1 (iss):     "CN=Caliptra EAT DPE Attestation Key"
             signature:     96 B
-          nonce:           97b30feb24efdb4cf6e60d2accf03ae04b30a6c6257f25f7f301ee77e4cd327f (32 B)
+          nonce:           767c35256868239b6d734f8b394bbc2b8611fa19acc3d02c7d9d3701f9f105c9 (32 B)
           opaque:          0 B
           signature:       96 B
 ```
@@ -109,15 +112,15 @@ child are folded into one `a > b > c` path line instead of a line per level
 (`[4..30]: 27 x 0000...`), which matters for the measurement claim's 32
 registers where most are unused; and byte strings that are entirely printable
 ASCII get their text shown next to the hex. The full dump with every decoder
-enabled is 89 lines (~6 KB), 26 lines (~1.3 KB) with none.
+enabled is 92 lines (~6.3 KB), 26 lines (~1.3 KB) with none.
 
 Like `--decode-certs`, this is decoding for readability — the SPDM signature
 is not verified.
 
 `--format json` gives the full structure instead. There, `--truncate N` cuts
 each leaf to the first N bytes (default 128 when passed bare), appends `...`,
-and adds a `__bytes_len__` field with the original length — ~32 KB becomes
-~5 KB at 128.
+and adds a `__bytes_len__` field with the original length — ~36 KB becomes
+~6.4 KB at 128.
 
 `--no-cbor` suppresses the decoded dump while still fetching, decoding and
 nonce-checking the bundle — useful for long soak runs, where `--save-bundle`
@@ -213,20 +216,20 @@ Against `ast2700-irot.local`:
   Status         : ready
   Id             : CompositeEATBundle
   Status         : Ready
-  Bundle length  : 23020 (base64 chars)
+  Bundle length  : 25532 (base64 chars)
   ... pausing 5s before step 3
 [3] POST /redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMCCompositeEATBundle.Generate
-  Nonce          : wH62At31qeW3X0aTd17bkMBwYZFTYBQzMQDsCxaSTi4=
-  Nonce (hex)    : c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e
+  Nonce          : E0zHe/mEMFzbhJYUv8S+SY/RBxx1b0JkVgquk3f90cU=
+  Nonce (hex)    : 134cc77bf984305cdb849614bfc4be498fd1071c756f4264560aae9377fdd1c5
   ... pausing 5s before step 4
 [4] GET /redfish/v1/ComponentIntegrity/CompositeEATBundle (poll)
   Status         : ready
   Id             : CompositeEATBundle
   Status         : Ready
-  Bundle length  : 23020 (base64 chars)
-  Bundle bytes   : 17263 (after base64 decode)
+  Bundle length  : 25532 (base64 chars)
+  Bundle bytes   : 19149 (after base64 decode)
   Profile        : https://github.com/aspeedtech-bmc/profile/composite_eat
-  Nonce (token)  : c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e
+  Nonce (token)  : 134cc77bf984305cdb849614bfc4be498fd1071c756f4264560aae9377fdd1c5
   Nonce echo     : match
   Submodules     : env.smc0, env.smc1
   Detached parts : env.smc0, env.smc1
@@ -237,33 +240,36 @@ Tag(602) Detached EAT Bundle
     protected
       1 (alg):             -35 (ES384)
       3 (content type):    "application/eat+cwt"
-      34 (x5t):            -43 (SHA-384) 18770399228bed601d95e891f4fc6927faaa5c96437ab4d934ca3919a488b5fc... (48 B)
+      34 (x5t):            -43 (SHA-384) 6353d3dea89d10296518d379adc81fa0dd27ad99f250f88506b973f6dd996a73... (48 B)
     unprotected
-      33 (x5chain):        4 cert(s), 1465, 770, 909, 675 bytes
+      33 (x5chain):        7 cert(s), 1465, 772, 907, 674, 811, 536, 531 bytes
         [0] CN=DPE Leaf              EC secp384r1 2023-01-01..9999-12-31  issued by [1]
         [1] CN=Caliptra 1.0 Rt Alias EC secp384r1 2023-01-01..9999-12-31  issued by [2]
         [2] CN=Caliptra 1.0 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
-        [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issuer not in chain
+        [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issued by [4]
+        [4] CN=Caliptra 1.0 IDevID   EC secp384r1 2026-03-21..9999-12-31  issued by [5]
+        [5] CN=AST27x0_ECDSA0        EC secp384r1 2026-01-20..9999-12-31  issued by [6]
+        [6] CN=ASPEED_CA             EC secp384r1 2025-03-06..9999-12-31  self-signed
     claims
-      10 (nonce):          c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e (32 B)
-      256 (ueid):          aa42300410323205 (8 B)
+      10 (nonce):          134cc77bf984305cdb849614bfc4be498fd1071c756f4264560aae9377fdd1c5 (32 B)
+      256 (ueid):          3512350410323205 (8 B)
       265 (profile):       "https://github.com/aspeedtech-bmc/profile/composite_eat"
       266 (submods)
-        env.smc0:          -43 (SHA-384) a4480db875c80dc1a292a62e8ea3be0c5ec786aa7d44ad0595a22eddaac482c5... (48 B)
-        env.smc1:          -43 (SHA-384) c4885054b20a82a77215f56ee40241abc7e5d9165d45590fe96e92175a172bf9... (48 B)
+        env.smc0:          -43 (SHA-384) a06b7c665591c57ad115e943bba977d36712ea81ed699d68a4757870f58ff004... (48 B)
+        env.smc1:          -43 (SHA-384) eabc0e4c8101b93a276a585f33794cf3499cd81a6ed0674f3c5161adbb200d37... (48 B)
       273 (measurements)
-        application/cbor:  a50198205830b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b... (1824 B)
+        application/cbor:  a50198205830adb7976df2fcc3828d282341e43ec49db7e06133de7d4df88260... (1824 B)
           1
-            [0]:           b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b1246ee54d26c... (48 B)
-            [1]:           b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b1246ee54d26c... (48 B)
+            [0]:           adb7976df2fcc3828d282341e43ec49db7e06133de7d4df88260e5c3b7190b29... (48 B)
+            [1]:           adb7976df2fcc3828d282341e43ec49db7e06133de7d4df88260e5c3b7190b29... (48 B)
             [2]:           97b1dc9fce4b7b3495abcaa9fc663828fefdf51beddc200192ad434c7b5be3c7... (48 B)
             [3]:           97b1dc9fce4b7b3495abcaa9fc663828fefdf51beddc200192ad434c7b5be3c7... (48 B)
             [4..30]:       27 x 0000000000000000000000000000000000000000000000000000000000000000... (48 B)
-            [31]:          c9ee4ded92eba1613836a5c05e188989c11526c81d6129f744cfe27df5ce7460... (48 B)
+            [31]:          93527643023ad308b4c9ffc970106ab50138c23a7ed8b1178359b737954072c8... (48 B)
           2:               32 x 0
           3:               0000000000000000000000000000000000000000000000000000000000000000 (32 B)
-          4:               bcbd7ea3efcd64df89250caede863dd1c03b24513513fd8e80911a878ae598d0... (48 B)
-          5:               704e9517519d526de2d6c66ea415898968f71d8df37dc63ea53a779d46e89590... (96 B)
+          4:               da3774edfde39d8a59d8f1b7fc63831ddbe841c24bf4aa5ad119906b21f81590... (48 B)
+          5:               b97144cef01416225bd9293ef71b75161d63e5c5ec4862abf84ff3b315aeeb24... (96 B)
     signature:             96 B
   detached parts
     env.smc0:              5396 B
@@ -281,7 +287,7 @@ Tag(602) Detached EAT Bundle
         MEASUREMENTS:      SPDM 1.2, slot 0, 2 block(s), record 78 B
           [  1] type 8                 digest   48 B  5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)
           [ 26] type 9                 raw      16 B  "0123456789ab" + 4 B
-          nonce:           135d5ae9313c8fdfef99f23d22d3b5fda5691ea7afe070e9089d586ea89bb84b (32 B)
+          nonce:           ce22c6867e110776a8f58392a2414818d72dd26909993428821c0aa25c8e3f0e (32 B)
           opaque:          0 B
           signature:       96 B
     env.smc1:              5743 B
@@ -302,7 +308,7 @@ Tag(602) Detached EAT Bundle
             protected:     1 (alg) = -35 (ES384)
             unprotected:   4 (kid) = 4e1060f07274aeb56409503f163531aa473a7eb1b742eecdacb2721117002a35... (48 B)
             claims
-              10 (nonce):  c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e (32 B)
+              10 (nonce):  134cc77bf984305cdb849614bfc4be498fd1071c756f4264560aae9377fdd1c5 (32 B)
               263 (dbgstat): 1
               265 (profile) > Tag(111): 312e332e362e312e342e312e34323632332e312e33 (21 B) "1.3.6.1.4.1.42623.1.3"
               273 (measurements)
@@ -317,7 +323,7 @@ Tag(602) Detached EAT Bundle
                       1 > 2 > [0]: [7, 5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)]
               1 (iss):     "CN=Caliptra EAT DPE Attestation Key"
             signature:     96 B
-          nonce:           97b30feb24efdb4cf6e60d2accf03ae04b30a6c6257f25f7f301ee77e4cd327f (32 B)
+          nonce:           767c35256868239b6d734f8b394bbc2b8611fa19acc3d02c7d9d3701f9f105c9 (32 B)
           opaque:          0 B
           signature:       96 B
 
