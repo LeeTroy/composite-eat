@@ -32,8 +32,18 @@ except ImportError:  # --decode-certs is simply unavailable then
     x509 = None
 
 COLLECTION_PATH = "/redfish/v1/ComponentIntegrity/"
-BUNDLE_PATH = "/redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/"
+# Current firmware; both are also discovered from the collection's Oem block,
+# and these are only the fallback when it advertises nothing.
+BUNDLE_PATH = "/redfish/v1/ComponentIntegrity/CompositeEATBundle"
 ACTION_PATH = (
+    "/redfish/v1/ComponentIntegrity/Actions/Oem/"
+    "OpenBMCCompositeEATBundle.Generate"
+)
+# Older firmware used these; kept for reference in --help and the README.
+LEGACY_BUNDLE_PATH = (
+    "/redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/"
+)
+LEGACY_ACTION_PATH = (
     "/redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMC.GetCompositeEATBundle"
 )
 
@@ -107,6 +117,28 @@ def bundle_status(body):
 
 def normalize(status):
     return str(status).strip().lower() if status is not None else ""
+
+
+def discover_paths(body, args):
+    """Read the bundle and action URIs out of the collection's Oem block.
+
+    Firmware has moved these once already, so prefer what the service
+    advertises and fall back to the built-in defaults.
+    """
+    bundle = action = None
+    oem = body.get("Oem") or {}
+    for vendor in oem.values():
+        if not isinstance(vendor, dict):
+            continue
+        resource = vendor.get("CompositeEATBundle")
+        if isinstance(resource, dict) and resource.get("@odata.id"):
+            bundle = resource["@odata.id"]
+        for name, entry in (vendor.get("Actions") or {}).items():
+            if isinstance(entry, dict) and entry.get("target") \
+                    and "CompositeEATBundle" in name:
+                action = entry["target"]
+    return (args.bundle_path or bundle or BUNDLE_PATH,
+            args.action_path or action or ACTION_PATH)
 
 
 def show_collection(body, quiet=False):
@@ -900,18 +932,18 @@ def show_eat_summary(decoded, nonce_b64, quiet=False):
             quiet=quiet)
 
 
-def wait_for_state(client, states, *, interval, timeout, quiet=False,
+def wait_for_state(client, states, *, path, interval, timeout, quiet=False,
                    label="state"):
     """Poll the bundle resource until its status is in `states`."""
     deadline = time.monotonic() + timeout
     while True:
-        body = client.get(BUNDLE_PATH)
+        body = client.get(path)
         status = normalize(bundle_status(body))
         log("  Status         : %s" % (status or "-"), quiet=quiet)
         if status in states:
             return body, status
         if status not in BUSY_STATES:
-            raise RedfishError(f"unexpected {label} '{status}' from {BUNDLE_PATH}")
+            raise RedfishError(f"unexpected {label} '{status}' from {path}")
         if time.monotonic() >= deadline:
             raise RedfishError(f"timed out waiting for {label} in {states}")
         time.sleep(interval)
@@ -930,12 +962,16 @@ def run_once(client, args, iteration):
     log("\n=== Iteration %d/%d ===" % (iteration, args.loop), quiet=quiet)
 
     log("[1] GET %s" % COLLECTION_PATH, quiet=quiet)
-    show_collection(client.get(COLLECTION_PATH), quiet=quiet)
+    collection = client.get(COLLECTION_PATH)
+    show_collection(collection, quiet=quiet)
+    bundle_path, action_path = discover_paths(collection, args)
+    log("  Bundle URI     : %s" % bundle_path, quiet=quiet)
+    log("  Action URI     : %s" % action_path, quiet=quiet)
 
     step_pause(args, "step 2")
-    log("[2] GET %s" % BUNDLE_PATH, quiet=quiet)
+    log("[2] GET %s" % bundle_path, quiet=quiet)
     body, _ = wait_for_state(
-        client, READY_STATES + IDLE_STATES,
+        client, READY_STATES + IDLE_STATES, path=bundle_path,
         interval=args.interval, timeout=args.timeout, quiet=quiet,
         label="pre-request status",
     )
@@ -943,19 +979,19 @@ def run_once(client, args, iteration):
 
     step_pause(args, "step 3")
     nonce = base64.b64encode(secrets.token_bytes(32)).decode()
-    log("[3] POST %s" % ACTION_PATH, quiet=quiet)
+    log("[3] POST %s" % action_path, quiet=quiet)
     log("  Nonce          : %s" % nonce, quiet=quiet)
     if BYTES_ENC != "base64":
         log("  Nonce (hex)    : %s" % base64.b64decode(nonce).hex(),
             quiet=quiet)
-    resp = client.post(ACTION_PATH, {"Nonce": nonce})
+    resp = client.post(action_path, {"Nonce": nonce})
     if resp:
         log("  Response       : %s" % json.dumps(resp)[:400], quiet=quiet)
 
     step_pause(args, "step 4")
-    log("[4] GET %s (poll)" % BUNDLE_PATH, quiet=quiet)
+    log("[4] GET %s (poll)" % bundle_path, quiet=quiet)
     body, _ = wait_for_state(
-        client, READY_STATES,
+        client, READY_STATES, path=bundle_path,
         interval=args.interval, timeout=args.timeout, quiet=quiet,
         label="bundle status",
     )
@@ -1035,6 +1071,14 @@ def parse_args(argv=None):
     parser.add_argument("--no-cbor", dest="show_cbor", action="store_false",
                         help="skip the decoded CBOR dump; still fetch, decode "
                              "and check the bundle")
+    parser.add_argument("--bundle-path", metavar="URI",
+                        help="bundle resource URI; overrides what the "
+                             "collection advertises (default: %s)"
+                             % BUNDLE_PATH)
+    parser.add_argument("--action-path", metavar="URI",
+                        help="generate action URI; overrides what the "
+                             "collection advertises (default: %s)"
+                             % ACTION_PATH)
     parser.add_argument("--decode-certs", action="store_true",
                         help="decode the X.509 certificates in cert_chain and "
                              "x5chain, showing one summary line each "

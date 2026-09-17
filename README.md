@@ -9,16 +9,18 @@ result.
 Each iteration performs:
 
 1. `GET /redfish/v1/ComponentIntegrity/` — show the collection members.
-2. `GET /redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/` —
-   continue once the status is `Ready` or `Idle` (polls while `InProgress`).
-3. `POST /redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMC.GetCompositeEATBundle`
-   with a freshly generated nonce:
+2. `GET` the bundle resource — `/redfish/v1/ComponentIntegrity/CompositeEATBundle`
+   — and continue once the status is `Ready` or `Idle` (polls while
+   `InProgress`).
+3. `POST` the generate action —
+   `/redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMCCompositeEATBundle.Generate`
+   — with a freshly generated nonce:
 
    ```json
    { "Nonce": "<base64 of 32 random bytes>" }
    ```
 
-4. `GET .../CompositeEATBundle/` in a loop — sleep 2 s while `InProgress`;
+4. `GET` the bundle resource in a loop — sleep 2 s while `InProgress`;
    when `Ready`, base64-decode the `CompositeEATBundle` property, parse it as
    CBOR and print it.
 5. Pause `--loop-delay` seconds (default 10), then go back to step 1 until
@@ -38,8 +40,8 @@ one line.
 `--format tree` (the default) prints a short annotated tree: COSE header
 parameters, CWT/EAT claims, COSE algorithm and hash identifiers are shown by
 name, byte strings as a preview plus their true length, and the cert
-chain and detached parts as sizes. It is ~1 KB versus ~22 KB for the JSON
-form. `--truncate N` sets the preview width here.
+chain and detached parts as sizes. It is ~1.3 KB (26 lines) versus ~32 KB
+(104 lines) for the JSON form. `--truncate N` sets the preview width here.
 
 `--decode-certs` parses the DER certificates in the token's `x5chain` header
 and in each detached part's `cert_chain`, printing one line per certificate:
@@ -55,6 +57,8 @@ performed.
       33 (x5chain):        4 cert(s), 1465, 770, 909, 675 bytes
         [0] CN=DPE Leaf              EC secp384r1 2023-01-01..9999-12-31  issued by [1]
         [1] CN=Caliptra 1.0 Rt Alias EC secp384r1 2023-01-01..9999-12-31  issued by [2]
+        [2] CN=Caliptra 1.0 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
+        [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issuer not in chain
 ...
       cert_chain:          4983 B, 6 cert(s)
         [0] CN=DevelopCA             EC secp384r1 2026-09-08..2036-09-05  self-signed
@@ -69,22 +73,21 @@ opaque data and signature sizes. A raw block whose value is itself CBOR is
 identified rather than dumped.
 
 ```
-      signed_measurements: 375 B
+      signed_measurements: 722 B
         SPDM transcript:   GET_VERSION, VERSION, GET_CAPABILITIES, CAPABILITIES
                            NEGOTIATE_ALGORITHMS, ALGORITHMS, GET_MEASUREMENTS
                            MEASUREMENTS
-        MEASUREMENTS:      SPDM 1.2, slot 0, 2 block(s), record 78 B
-          [  1] mutable firmware       digest   48 B  AQEBAQEBAQEBAQEB... (48 B)
+        MEASUREMENTS:      SPDM 1.2, slot 0, 2 block(s), record 425 B
           [ 26] type 9                 raw      16 B  "0123456789ab" + 4 B
           [253] type 10                raw     395 B  CBOR Tag(61) CWT / Tag(18) COSE_Sign1
             protected:     1 (alg) = -35 (ES384)
-            unprotected:   4 (kid) = 4e1060f07274aeb56409503f163531aa473a7eb1... (48 B)
+            unprotected:   4 (kid) = 4e1060f07274aeb56409503f163531aa473a7eb1b742eecdacb2721117002a35... (48 B)
             claims
-              10 (nonce):  3277029318b0de1b9501761c9232ab946a1c122ae7b1e1d73e151e82c121f842
+              10 (nonce):  c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e (32 B)
               263 (dbgstat): 1
-              265 (profile) > Tag(111): 312e332e...312e33 (21 B) "1.3.6.1.4.1.42623.1.3"
+              265 (profile) > Tag(111): 312e332e362e312e342e312e34323632332e312e33 (21 B) "1.3.6.1.4.1.42623.1.3"
               273 (measurements)
-                10571:     a100a1008182a100a300d902304e706c6174666f726d2d73... (116 B)
+                10571:     a100a1008182a100a300d902304e706c6174666f726d2d737461746501714173... (116 B)
                   0 > 0 > [0]
                     [0] > 0
                       0 > Tag(560): 706c6174666f726d2d7374617465 (14 B) "platform-state"
@@ -92,9 +95,12 @@ identified rather than dumped.
                       2:       "AST1040"
                     [1] > [0]
                       0:       0
-                      1 > 2 > [0]: [7, 5f91f06163adf14215146e922ce9b1eb... (48 B)]
+                      1 > 2 > [0]: [7, 5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)]
               1 (iss):     "CN=Caliptra EAT DPE Attestation Key"
             signature:     96 B
+          nonce:           97b30feb24efdb4cf6e60d2accf03ae04b30a6c6257f25f7f301ee77e4cd327f (32 B)
+          opaque:          0 B
+          signature:       96 B
 ```
 
 Three rules keep even this deep structure short: containers holding a single
@@ -103,19 +109,21 @@ child are folded into one `a > b > c` path line instead of a line per level
 (`[4..30]: 27 x 0000...`), which matters for the measurement claim's 32
 registers where most are unused; and byte strings that are entirely printable
 ASCII get their text shown next to the hex. The full dump with every decoder
-enabled is ~73 lines, ~26 with none.
+enabled is 89 lines (~6 KB), 26 lines (~1.3 KB) with none.
 
 Like `--decode-certs`, this is decoding for readability — the SPDM signature
 is not verified.
 
-`--format json` gives the full structure instead, with every byte string
-in base64. There, `--truncate N` cuts each leaf to the first N bytes
-(default 128 when passed bare), appends `...`, and adds a `__bytes_len__`
-field with the original length — ~4.3 KB at 128, ~3.3 KB at 32.
+`--format json` gives the full structure instead. There, `--truncate N` cuts
+each leaf to the first N bytes (default 128 when passed bare), appends `...`,
+and adds a `__bytes_len__` field with the original length — ~32 KB becomes
+~5 KB at 128.
 
-`--no-cbor` suppresses the (large) decoded dump while still fetching,
-decoding and nonce-checking the bundle — useful for long soak runs, where
-`--save-bundle` can keep the raw bytes for later inspection.
+`--no-cbor` suppresses the decoded dump while still fetching, decoding and
+nonce-checking the bundle — useful for long soak runs, where `--save-bundle`
+can keep the raw bytes for later inspection. Note that `-q --no-cbor`
+together print nothing at all: `-q` silences the step log and `--no-cbor`
+removes the only thing it would still print.
 
 Only the essential response fields are printed (name, member list, id, status,
 nonce, bundle size) plus the decoded bundle.
@@ -159,6 +167,8 @@ python composite_eat.py -H 192.168.0.100 -u root -p 0penBmc -n 5
 | `-n, --loop` | `1` | How many times to run the whole sequence |
 | `--scheme` | `https` | `https` or `http` |
 | `--verify` | off | Verify the TLS certificate (self-signed BMC certs fail) |
+| `--bundle-path URI` | discovered | Override the bundle resource URI |
+| `--action-path URI` | discovered | Override the generate action URI |
 | `--interval` | `2.0` | Poll interval in seconds |
 | `--step-delay` | `5.0` | Pause between steps and before printing the decoded bundle (`0` disables) |
 | `--loop-delay` | `10.0` | Pause between iterations, in seconds (`0` disables) |
@@ -189,32 +199,34 @@ python composite_eat.py -H 192.168.0.100 -n 3
 Against `ast2700-irot.local`:
 
 ```
-./composite_eat.py -H ast2700-irot.local -u root -p 0penBmc -n 1000 --scheme https --truncate 64 --decode-certs --decode-measurements  --decode-measurement-cbor
+./composite_eat.py -H ast2700-irot.local -u root -p 0penBmc -n 1000 --truncate 64 --decode-certs --decode-measurements --decode-measurement-cbor
 === Iteration 1/1000 ===
 [1] GET /redfish/v1/ComponentIntegrity/
   Name           : Component Integrity Collection
   Members@count  : 2
   Member         : /redfish/v1/ComponentIntegrity/smc0
   Member         : /redfish/v1/ComponentIntegrity/smc1
+  Bundle URI     : /redfish/v1/ComponentIntegrity/CompositeEATBundle
+  Action URI     : /redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMCCompositeEATBundle.Generate
   ... pausing 5s before step 2
-[2] GET /redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/
+[2] GET /redfish/v1/ComponentIntegrity/CompositeEATBundle
   Status         : ready
   Id             : CompositeEATBundle
   Status         : Ready
   Bundle length  : 23020 (base64 chars)
   ... pausing 5s before step 3
-[3] POST /redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMC.GetCompositeEATBundle
-  Nonce          : i+1EEnZm5EsCEGIrLwQwtb7LJWtTNYWCGX028FteIFs=
-  Nonce (hex)    : 8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b
+[3] POST /redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMCCompositeEATBundle.Generate
+  Nonce          : wH62At31qeW3X0aTd17bkMBwYZFTYBQzMQDsCxaSTi4=
+  Nonce (hex)    : c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e
   ... pausing 5s before step 4
-[4] GET /redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/ (poll)
+[4] GET /redfish/v1/ComponentIntegrity/CompositeEATBundle (poll)
   Status         : ready
   Id             : CompositeEATBundle
   Status         : Ready
   Bundle length  : 23020 (base64 chars)
   Bundle bytes   : 17263 (after base64 decode)
   Profile        : https://github.com/aspeedtech-bmc/profile/composite_eat
-  Nonce (token)  : 8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b
+  Nonce (token)  : c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e
   Nonce echo     : match
   Submodules     : env.smc0, env.smc1
   Detached parts : env.smc0, env.smc1
@@ -233,12 +245,12 @@ Tag(602) Detached EAT Bundle
         [2] CN=Caliptra 1.0 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
         [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issuer not in chain
     claims
-      10 (nonce):          8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b (32 B)
+      10 (nonce):          c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e (32 B)
       256 (ueid):          aa42300410323205 (8 B)
       265 (profile):       "https://github.com/aspeedtech-bmc/profile/composite_eat"
       266 (submods)
-        env.smc0:          -43 (SHA-384) acbcbeeaa161d4659dba4f466d6adf8323f095db5364848564da54522fb975c9... (48 B)
-        env.smc1:          -43 (SHA-384) 4423f259987f2765018210b786678a052f9878442426bb4045e92cfa385b1caf... (48 B)
+        env.smc0:          -43 (SHA-384) a4480db875c80dc1a292a62e8ea3be0c5ec786aa7d44ad0595a22eddaac482c5... (48 B)
+        env.smc1:          -43 (SHA-384) c4885054b20a82a77215f56ee40241abc7e5d9165d45590fe96e92175a172bf9... (48 B)
       273 (measurements)
         application/cbor:  a50198205830b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b... (1824 B)
           1
@@ -269,7 +281,7 @@ Tag(602) Detached EAT Bundle
         MEASUREMENTS:      SPDM 1.2, slot 0, 2 block(s), record 78 B
           [  1] type 8                 digest   48 B  5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)
           [ 26] type 9                 raw      16 B  "0123456789ab" + 4 B
-          nonce:           e0491382faa974fadd3400e0b37bf71ed7b615def4fd853fa9f49df808459833 (32 B)
+          nonce:           135d5ae9313c8fdfef99f23d22d3b5fda5691ea7afe070e9089d586ea89bb84b (32 B)
           opaque:          0 B
           signature:       96 B
     env.smc1:              5743 B
@@ -290,7 +302,7 @@ Tag(602) Detached EAT Bundle
             protected:     1 (alg) = -35 (ES384)
             unprotected:   4 (kid) = 4e1060f07274aeb56409503f163531aa473a7eb1b742eecdacb2721117002a35... (48 B)
             claims
-              10 (nonce):  8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b (32 B)
+              10 (nonce):  c07eb602ddf5a9e5b75f4693775edb90c0706191536014333100ec0b16924e2e (32 B)
               263 (dbgstat): 1
               265 (profile) > Tag(111): 312e332e362e312e342e312e34323632332e312e33 (21 B) "1.3.6.1.4.1.42623.1.3"
               273 (measurements)
@@ -305,7 +317,7 @@ Tag(602) Detached EAT Bundle
                       1 > 2 > [0]: [7, 5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)]
               1 (iss):     "CN=Caliptra EAT DPE Attestation Key"
             signature:     96 B
-          nonce:           9a622866cbb35a83f50bdc539e0cfb05f1026fc1ea2dc14b9157185ca55b37d9 (32 B)
+          nonce:           97b30feb24efdb4cf6e60d2accf03ae04b30a6c6257f25f7f301ee77e4cd327f (32 B)
           opaque:          0 B
           signature:       96 B
 
@@ -328,6 +340,19 @@ and nested CBOR as `{"__cbor__": ...}`, so the output stays valid JSON. Use
 | `130` | Interrupted (Ctrl-C) |
 
 ## Compatibility notes
+
+The bundle and action URIs are **discovered** from the collection's
+`Oem.OpenBMC` block on every iteration (`CompositeEATBundle.@odata.id` and the
+`Actions` entry whose name contains `CompositeEATBundle`), so a firmware
+rename does not need a script change. The discovered URIs are printed under
+step 1. If the collection advertises nothing, these defaults are used:
+
+* bundle: `/redfish/v1/ComponentIntegrity/CompositeEATBundle`
+* action: `/redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMCCompositeEATBundle.Generate`
+
+Older firmware served `/redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/`
+and the `OpenBMC.GetCompositeEATBundle` action; `--bundle-path` / `--action-path`
+can point at those, or anywhere else, if discovery is not available.
 
 Property names vary between OpenBMC builds, so the script accepts more than
 one spelling:
