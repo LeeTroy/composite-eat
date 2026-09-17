@@ -189,57 +189,127 @@ python composite_eat.py -H 192.168.0.100 -n 3
 Against `ast2700-irot.local`:
 
 ```
-=== Iteration 1/1 ===
+./composite_eat.py -H ast2700-irot.local -u root -p 0penBmc -n 1000 --scheme https --truncate 64 --decode-certs --decode-measurements  --decode-measurement-cbor
+=== Iteration 1/1000 ===
 [1] GET /redfish/v1/ComponentIntegrity/
   Name           : Component Integrity Collection
   Members@count  : 2
   Member         : /redfish/v1/ComponentIntegrity/smc0
   Member         : /redfish/v1/ComponentIntegrity/smc1
+  ... pausing 5s before step 2
 [2] GET /redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/
   Status         : ready
   Id             : CompositeEATBundle
   Status         : Ready
-  Bundle length  : 20584 (base64 chars)
+  Bundle length  : 23020 (base64 chars)
+  ... pausing 5s before step 3
 [3] POST /redfish/v1/ComponentIntegrity/Actions/Oem/OpenBMC.GetCompositeEATBundle
-  Nonce          : UC+yPOroDQNgnrRQl5sIJpuRfg+EbTTw7C4J7HyhALM=
+  Nonce          : i+1EEnZm5EsCEGIrLwQwtb7LJWtTNYWCGX028FteIFs=
+  Nonce (hex)    : 8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b
+  ... pausing 5s before step 4
 [4] GET /redfish/v1/ComponentIntegrity/Oem/OpenBMC/CompositeEATBundle/ (poll)
-  Status         : inprogress
   Status         : ready
   Id             : CompositeEATBundle
   Status         : Ready
-  Bundle length  : 20584 (base64 chars)
-  Bundle bytes   : 15438 (after base64 decode)
-  Profile        : https://github.com/aspeedtech-bmc/profile_does_not_exist
-  Nonce (token)  : UC+yPOroDQNgnrRQl5sIJpuRfg+EbTTw7C4J7HyhALM=
+  Bundle length  : 23020 (base64 chars)
+  Bundle bytes   : 17263 (after base64 decode)
+  Profile        : https://github.com/aspeedtech-bmc/profile/composite_eat
+  Nonce (token)  : 8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b
   Nonce echo     : match
   Submodules     : env.smc0, env.smc1
   Detached parts : env.smc0, env.smc1
+  ... pausing 5s before the decoded bundle
 --- Decoded Bundle (CBOR) ---
 Tag(602) Detached EAT Bundle
   main token [Tag(61) CWT / Tag(18) COSE_Sign1]
     protected
       1 (alg):             -35 (ES384)
       3 (content type):    "application/eat+cwt"
-      34 (x5t):            -43 (SHA-384) 18770399228bed601d95e891f4fc6927faaa5c96437ab4d9... (48 B)
+      34 (x5t):            -43 (SHA-384) 18770399228bed601d95e891f4fc6927faaa5c96437ab4d934ca3919a488b5fc... (48 B)
     unprotected
       33 (x5chain):        4 cert(s), 1465, 770, 909, 675 bytes
+        [0] CN=DPE Leaf              EC secp384r1 2023-01-01..9999-12-31  issued by [1]
+        [1] CN=Caliptra 1.0 Rt Alias EC secp384r1 2023-01-01..9999-12-31  issued by [2]
+        [2] CN=Caliptra 1.0 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
+        [3] CN=Caliptra 1.0 LDevID   EC secp384r1 2023-01-01..9999-12-31  issuer not in chain
     claims
-      10 (nonce):          e067b2f24e2804a684c42887483f4f2e94931bea04308b29344d2162cd42b97f (32 B)
+      10 (nonce):          8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b (32 B)
       256 (ueid):          aa42300410323205 (8 B)
-      265 (profile):       "https://github.com/aspeedtech-bmc/profile/compos..."
+      265 (profile):       "https://github.com/aspeedtech-bmc/profile/composite_eat"
       266 (submods)
-        env.smc0:          -43 (SHA-384) 5b11746bdda33e5c0f1d2f58468f5b32c281247016fdb38e... (48 B)
-        env.smc1:          -43 (SHA-384) 529faabddb28cd8bcd5aeb0b071c1bba1100ba1d5def7c01... (48 B)
+        env.smc0:          -43 (SHA-384) acbcbeeaa161d4659dba4f466d6adf8323f095db5364848564da54522fb975c9... (48 B)
+        env.smc1:          -43 (SHA-384) 4423f259987f2765018210b786678a052f9878442426bb4045e92cfa385b1caf... (48 B)
       273 (measurements)
-        application/cbor:  a50198205830b3f58c3bfc4318dd23ab2eba8e7d00ef2445... (1824 B)
+        application/cbor:  a50198205830b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b... (1824 B)
+          1
+            [0]:           b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b1246ee54d26c... (48 B)
+            [1]:           b3f58c3bfc4318dd23ab2eba8e7d00ef2445c5d1783cd6a74c5b1246ee54d26c... (48 B)
+            [2]:           97b1dc9fce4b7b3495abcaa9fc663828fefdf51beddc200192ad434c7b5be3c7... (48 B)
+            [3]:           97b1dc9fce4b7b3495abcaa9fc663828fefdf51beddc200192ad434c7b5be3c7... (48 B)
+            [4..30]:       27 x 0000000000000000000000000000000000000000000000000000000000000000... (48 B)
+            [31]:          c9ee4ded92eba1613836a5c05e188989c11526c81d6129f744cfe27df5ce7460... (48 B)
+          2:               32 x 0
+          3:               0000000000000000000000000000000000000000000000000000000000000000 (32 B)
+          4:               bcbd7ea3efcd64df89250caede863dd1c03b24513513fd8e80911a878ae598d0... (48 B)
+          5:               704e9517519d526de2d6c66ea415898968f71d8df37dc63ea53a779d46e89590... (96 B)
     signature:             96 B
   detached parts
-    env.smc0:              5395 B
-      cert_chain:          4983 B
-      signed_measurements: 374 B
-    env.smc1:              5742 B
-      cert_chain:          4983 B
-      signed_measurements: 721 B
+    env.smc0:              5396 B
+      cert_chain:          4983 B, 6 cert(s)
+        [0] CN=DevelopCA             EC secp384r1 2026-09-08..2036-09-05  self-signed
+        [1] CN=Caliptra 2.1 Ecc384 IDevID EC secp384r1 2026-09-08..2027-09-08  issued by [0]
+        [2] CN=Caliptra 2.1 Ecc384 LDevID EC secp384r1 2023-01-01..9999-12-31  issued by [1]
+        [3] CN=Caliptra 2.1 Ecc384 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [2]
+        [4] CN=Caliptra 2.1 Ecc384 Rt Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
+        [5] CN=DPE Leaf              EC secp384r1 2023-01-01..9999-12-31  issued by [4]
+      signed_measurements: 375 B
+        SPDM transcript:   GET_VERSION, VERSION, GET_CAPABILITIES, CAPABILITIES
+                           NEGOTIATE_ALGORITHMS, ALGORITHMS, GET_MEASUREMENTS
+                           MEASUREMENTS
+        MEASUREMENTS:      SPDM 1.2, slot 0, 2 block(s), record 78 B
+          [  1] type 8                 digest   48 B  5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)
+          [ 26] type 9                 raw      16 B  "0123456789ab" + 4 B
+          nonce:           e0491382faa974fadd3400e0b37bf71ed7b615def4fd853fa9f49df808459833 (32 B)
+          opaque:          0 B
+          signature:       96 B
+    env.smc1:              5743 B
+      cert_chain:          4983 B, 6 cert(s)
+        [0] CN=DevelopCA             EC secp384r1 2026-09-08..2036-09-05  self-signed
+        [1] CN=Caliptra 2.1 Ecc384 IDevID EC secp384r1 2026-09-08..2027-09-08  issued by [0]
+        [2] CN=Caliptra 2.1 Ecc384 LDevID EC secp384r1 2023-01-01..9999-12-31  issued by [1]
+        [3] CN=Caliptra 2.1 Ecc384 FMC Alias EC secp384r1 2023-01-01..9999-12-31  issued by [2]
+        [4] CN=Caliptra 2.1 Ecc384 Rt Alias EC secp384r1 2023-01-01..9999-12-31  issued by [3]
+        [5] CN=DPE Leaf              EC secp384r1 2023-01-01..9999-12-31  issued by [4]
+      signed_measurements: 722 B
+        SPDM transcript:   GET_VERSION, VERSION, GET_CAPABILITIES, CAPABILITIES
+                           NEGOTIATE_ALGORITHMS, ALGORITHMS, GET_MEASUREMENTS
+                           MEASUREMENTS
+        MEASUREMENTS:      SPDM 1.2, slot 0, 2 block(s), record 425 B
+          [ 26] type 9                 raw      16 B  "0123456789ab" + 4 B
+          [253] type 10                raw     395 B  CBOR Tag(61) CWT / Tag(18) COSE_Sign1
+            protected:     1 (alg) = -35 (ES384)
+            unprotected:   4 (kid) = 4e1060f07274aeb56409503f163531aa473a7eb1b742eecdacb2721117002a35... (48 B)
+            claims
+              10 (nonce):  8bed44127666e44b0210622b2f0430b5becb256b53358582197d36f05b5e205b (32 B)
+              263 (dbgstat): 1
+              265 (profile) > Tag(111): 312e332e362e312e342e312e34323632332e312e33 (21 B) "1.3.6.1.4.1.42623.1.3"
+              273 (measurements)
+                10571:     a100a1008182a100a300d902304e706c6174666f726d2d737461746501714173... (116 B)
+                  0 > 0 > [0]
+                    [0] > 0
+                      0 > Tag(560): 706c6174666f726d2d7374617465 (14 B) "platform-state"
+                      1:       "Aspeed Technology"
+                      2:       "AST1040"
+                    [1] > [0]
+                      0:       0
+                      1 > 2 > [0]: [7, 5f91f06163adf14215146e922ce9b1ebc0464e15da4cde9d823452acb62b72e2... (48 B)]
+              1 (iss):     "CN=Caliptra EAT DPE Attestation Key"
+            signature:     96 B
+          nonce:           9a622866cbb35a83f50bdc539e0cfb05f1026fc1ea2dc14b9157185ca55b37d9 (32 B)
+          opaque:          0 B
+          signature:       96 B
+
+[5] Sleeping 10s before iteration 2
 ```
 
 With `--format json`, binary values inside the CBOR structure are rendered as
